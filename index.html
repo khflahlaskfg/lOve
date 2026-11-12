@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Interactive Love</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;height:100dvh;background:#000;overflow:hidden;overscroll-behavior:none;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+body{position:fixed;inset:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+canvas{position:fixed;inset:0;width:100%;height:100%;height:100dvh;display:block}
+#ov{position:fixed;inset:0;z-index:10;background-color:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;transition:background-color .9s ease;cursor:pointer;padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+#ov.off{background-color:rgba(0,0,0,0);pointer-events:none}
+#sc{transition:opacity .9s ease}
+#aura{position:absolute;left:50%;top:50%;width:120vmin;height:120vmin;margin:-60vmin 0 0 -60vmin;border-radius:50%;pointer-events:none;background:radial-gradient(circle,rgba(255,40,130,.2) 0,rgba(255,20,147,.07) 38%,transparent 66%);animation:auraIn 3s ease-out backwards,breathe 7s ease-in-out 3s infinite}
+#bloom{position:absolute;left:var(--x,50%);top:var(--y,50%);width:6vmax;height:6vmax;margin:-3vmax 0 0 -3vmax;border-radius:50%;pointer-events:none;opacity:0;background:radial-gradient(circle,rgba(255,236,244,.85) 0,rgba(255,105,180,.4) 32%,rgba(255,20,147,.12) 58%,transparent 72%)}
+#go{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:clamp(20px,4.5vh,38px);padding:0 28px;text-align:center;outline:none;transition:opacity .7s ease,transform .9s cubic-bezier(.2,.7,.2,1),filter .7s ease}
+#em{position:relative;display:grid;place-items:center;width:1.5em;height:1.5em;font-size:clamp(36px,10.5vw,60px);line-height:1;filter:drop-shadow(0 0 16px rgba(255,60,140,.65));animation:emIn 1.8s cubic-bezier(.2,.7,.2,1) .4s backwards,beat 2.8s ease-in-out 2.2s infinite}
+#em::before,#em::after{content:"";position:absolute;inset:0;border-radius:50%;border:1px solid rgba(255,140,190,.45);opacity:0;animation:ring 5.6s cubic-bezier(.2,.5,.3,1) 2.2s infinite}
+#em::after{animation-delay:5s}
+#ln{margin:0;max-width:17em;font:italic 400 clamp(21px,5.8vw,34px)/1.5 "Iowan Old Style","Palatino Linotype",Palatino,"Hoefler Text",Georgia,"Noto Serif",serif;letter-spacing:.045em;color:#fde9f1;text-wrap:balance;text-shadow:0 0 14px rgba(255,105,180,.45);animation:glow 5s ease-in-out 3.2s infinite}
+#ln span{display:inline-block;animation:rise 1.5s cubic-bezier(.2,.7,.2,1) calc(1.3s + var(--i) * .13s) backwards}
+.up{animation:fadeIn 1.2s 2.6s backwards}
+#ov.off #go{opacity:0;transform:scale(1.08);filter:blur(10px)}
+#ov.off #sc,#ov.off #aura,#ov.off .up{opacity:0}
+#ov.off #bloom{animation:bloom .95s cubic-bezier(.15,.7,.25,1) forwards}
+@keyframes auraIn{from{opacity:0;transform:scale(.6)}}
+@keyframes breathe{0%,100%{transform:scale(.94)}50%{transform:scale(1.06)}}
+@keyframes emIn{from{opacity:0;transform:scale(.7)}}
+@keyframes beat{0%,60%,100%{transform:scale(1)}14%{transform:scale(1.1)}28%{transform:scale(1)}42%{transform:scale(1.06)}}
+@keyframes ring{0%{transform:scale(.7);opacity:0}12%{opacity:.55}100%{transform:scale(3.4);opacity:0}}
+@keyframes rise{from{opacity:0;transform:translateY(10px);filter:blur(8px)}}
+@keyframes glow{0%,100%{text-shadow:0 0 12px rgba(255,105,180,.35)}50%{text-shadow:0 0 20px rgba(255,105,180,.7),0 0 44px rgba(255,20,147,.3)}}
+@keyframes fadeIn{from{opacity:0}}
+@keyframes bloom{0%{opacity:.9;transform:scale(0)}30%{opacity:.65}100%{opacity:0;transform:scale(26)}}
+@media (prefers-reduced-motion:reduce){#ov *,#ov *::before,#ov *::after{animation:none!important}}
+.btn{position:fixed;z-index:20;width:44px;height:44px;margin:0;padding:0;border-radius:50%;border:1px solid rgba(255,105,180,.35);background:rgba(20,0,10,.45);color:#fff;font-size:20px;line-height:1;display:flex;align-items:center;justify-content:center;opacity:.5;cursor:pointer;-webkit-appearance:none;appearance:none;transition:opacity .2s}
+.btn:hover,.btn.ok{opacity:.95}
+#mute{right:calc(env(safe-area-inset-right,0px) + 14px);bottom:calc(env(safe-area-inset-bottom,0px) + 14px)}
+.up{left:calc(env(safe-area-inset-left,0px) + 14px);bottom:calc(env(safe-area-inset-bottom,0px) + 14px)}
+.up input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<canvas id="fg"></canvas>
+<div id="ov">
+  <canvas id="sc"></canvas>
+  <div id="aura"></div>
+  <div id="bloom"></div>
+  <div id="go" role="button" tabindex="0"><div id="em" aria-hidden="true"></div><p id="ln"></p></div>
+  <label class="btn up" id="up" title="Choose a music file" aria-label="Choose a music file">🎵<input type="file" id="file" accept="audio/*"></label>
+</div>
+<button class="btn" id="mute" aria-label="Mute or unmute music" style="display:none">🔊</button>
+
+<script>
+/* ================= CONFIG — customize here ================= */
+const CONFIG = {
+  recipientName: "Leen", // replaces "Sayang" from the video
+  audioUrl: "leen-music.mp3",             // local file path or direct MP3 URL; "" = no music
+  audioVolume: 0.7,                  // 0 to 1
+  showMusicUploadButton: true,       // subtle 🎵 icon on the start screen to pick a local audio file
+  openingText: "Tap anywhere to begin something made for you.", // the one sentence on the start screen
+  openingEmoji: "💗"                 // the emoji above it
+};
+/* =========================================================== */
+
+(() => {
+const $ = id => document.getElementById(id), R = Math.random, PI2 = Math.PI * 2;
+const bg = $('bg'), fg = $('fg'), sc = $('sc');
+const bx = bg.getContext('2d'), fx = fg.getContext('2d'), sx = sc.getContext('2d');
+const TF = '"Segoe UI","Trebuchet MS",Georgia,serif';
+const FONT = s => `800 ${s}px "Arial Rounded MT Bold","Trebuchet MS",Verdana,Arial,sans-serif`;
+
+/* Timeline in seconds after tap: [start, phase]. Edit to retime. */
+const TL = [[2,'dot'],[3,'3'],[4,'2'],[5,'1'],[6,'sc'],[7,'dot'],[8,'You'],[10,'Are'],[12,'My'],[14,'Love'],[16,'out'],[18,'heart']];
+
+let W = 1, H = 1, dpr = 1, mob = false, started = false, muted = false;
+let T = 0, ti = 0, ps = 0, pd = 1, cur = '';
+let S = 8, K = 10, HN = 400, CY = 0, rfs = 16, rows = 1, TXT = null;
+let cols = [], pool = [], perm = [], TG = {}, sD, sP, sR, sH = [], audio = null;
+
+/* ---------- Audio (unlocked inside the tap gesture) ---------- */
+function setAudio(src) {
+  if (!src) return;
+  if (!audio) {
+    audio = new Audio();
+    audio.loop = true; audio.preload = 'auto';
+    audio.setAttribute('playsinline', ''); audio.setAttribute('webkit-playsinline', '');
+    audio.volume = Math.max(0, Math.min(1, CONFIG.audioVolume));
+    audio.muted = muted;
+    audio.addEventListener('error', () => { $('mute').style.display = 'none'; });
+  }
+  audio.src = src;
+}
+setAudio(CONFIG.audioUrl);
+
+$('em').textContent = CONFIG.openingEmoji;
+CONFIG.openingText.split(' ').forEach((w, i) => {
+  const sp = document.createElement('span'); sp.textContent = w; sp.style.setProperty('--i', i); $('ln').append(sp, ' ');
+});
+let tapX = null, tapY = 0;
+$('ov').addEventListener('pointerdown', e => { tapX = e.clientX; tapY = e.clientY; }, { passive: true });
+$('ov').addEventListener('touchstart', e => { const t = e.touches[0]; if (t) { tapX = t.clientX; tapY = t.clientY; } }, { passive: true });
+
+let objUrl = null;
+const up = $('up');
+if (!CONFIG.showMusicUploadButton) up.style.display = 'none';
+['pointerdown','pointerup','touchstart','touchend','click'].forEach(e => up.addEventListener(e, ev => ev.stopPropagation()));
+$('file').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  if (f) { if (objUrl) URL.revokeObjectURL(objUrl); objUrl = URL.createObjectURL(f); setAudio(objUrl); up.classList.add('ok'); }
+});
+
+function go() {
+  if (started) return;
+  started = true; T = 0;
+  if (audio) { try { const p = audio.play(); if (p && p.catch) p.catch(() => {}); } catch (_) {} }
+  if (tapX !== null) { $('ov').style.setProperty('--x', tapX + 'px'); $('ov').style.setProperty('--y', tapY + 'px'); }
+  $('ov').classList.add('off');
+  setTimeout(() => { $('ov').style.display = 'none'; }, 1000);
+  if (audio && !audio.error) $('mute').style.display = 'flex';
+}
+['pointerup','touchend','click'].forEach(e => $('ov').addEventListener(e, go));
+document.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') go(); });
+$('mute').addEventListener('click', () => {
+  muted = !muted; if (audio) audio.muted = muted;
+  $('mute').textContent = muted ? '🔇' : '🔊';
+});
+
+/* ---------- Helpers & sprites (pre-rendered glow = fast on phones) ---------- */
+function hp(c, x, y, s) {
+  c.beginPath(); c.moveTo(x, y + s * .35);
+  c.bezierCurveTo(x + s * .6, y - s * .05, x + s * .35, y - s * .5, x, y - s * .2);
+  c.bezierCurveTo(x - s * .35, y - s * .5, x - s * .6, y - s * .05, x, y + s * .35);
+  c.closePath();
+}
+const mk = draw => { const c = document.createElement('canvas'); c.width = c.height = 64; draw(c.getContext('2d')); return c; };
+function mkSprites() {
+  const G = mob ? 6 : 12;
+  const dot = col => mk(x => { x.shadowColor = col; x.shadowBlur = G; x.fillStyle = col; x.beginPath(); x.arc(32, 32, 18, 0, PI2); x.fill(); x.fill(); });
+  sD = dot('#fff8e7'); sP = dot('#ff69b4'); sR = dot('#ffc4d9');
+  sH = ['#ff4d88', '#ff1493', '#ff85a2'].map(col => mk(x => { x.shadowColor = col; x.shadowBlur = G * .8; x.fillStyle = col; hp(x, 32, 36, 40); x.fill(); }));
+}
+
+/* ---------- Matrix rain ---------- */
+const CH = 'ILOVEYU♥ILOVEYU'.split(''), RC = ['#ff69b4', '#ff1493', '#ffb6c1'];
+function reset(c, init) {
+  c.h = -2 - R() * rows * (init ? .9 : .5); c.last = Math.floor(c.h); c.ch = [];
+  c.v = 5 + R() * 13; c.L = 8 + (R() * 16 | 0); c.c = RC[R() * 3 | 0];
+}
+function buildRain() {
+  rfs = mob ? 13 : 16; rows = Math.ceil(H / rfs);
+  const old = cols, n = Math.ceil(W / rfs); cols = [];
+  for (let i = 0; i < n; i++) {
+    const c = old[i] || {}; c.x = i * rfs + rfs / 2;
+    if (!old[i]) { reset(c, 1); if (started) { c.h = R() * rows; c.last = Math.floor(c.h); } }
+    cols.push(c);
+  }
+}
+function drawRain(dt) {
+  bx.clearRect(0, 0, W, H); bx.font = `${rfs}px monospace`; bx.textAlign = 'center';
+  for (const c of cols) {
+    c.h += c.v * dt; const f = Math.floor(c.h);
+    while (c.last < f) { c.last++; c.ch.unshift(CH[R() * CH.length | 0]); if (c.ch.length > c.L) c.ch.pop(); }
+    if (c.h - c.L > rows + 1) { reset(c, 0); continue; }
+    for (let k = 0; k < c.ch.length; k++) {
+      const y = (c.last - k + 1) * rfs;
+      if (y < 0 || y > H + rfs) continue;
+      bx.globalAlpha = k ? Math.pow(1 - k / c.L, 1.7) * .7 : 1;
+      bx.fillStyle = k ? c.c : '#ffc2d6';
+      if (!k && !mob) { bx.shadowColor = c.c; bx.shadowBlur = 8; }
+      bx.fillText(c.ch[k], c.x, y);
+      if (!k && !mob) bx.shadowBlur = 0;
+    }
+  }
+  bx.globalAlpha = 1;
+}
+
+/* ---------- Particle targets ---------- */
+function sample(str) {
+  const c = document.createElement('canvas'), x = c.getContext('2d', { willReadFrequently: true });
+  x.font = FONT(fs());
+  const w = Math.ceil(x.measureText(str).width) + 8, h = Math.ceil(fs() * 1.3);
+  c.width = w; c.height = h;
+  x.font = FONT(fs()); x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#fff';
+  x.fillText(str, w / 2, h / 2 + fs() * .04);
+  const d = x.getImageData(0, 0, w, h).data, out = [], ox = W / 2 - w / 2, oy = H * .48 - h / 2;
+  for (let y = S / 2; y < h; y += S) for (let xx = S / 2; xx < w; xx += S)
+    if (d[((y | 0) * w + (xx | 0)) * 4 + 3] > 110) out.push([ox + xx, oy + y]);
+  return out;
+}
+let _fs = 100; const fs = () => _fs;
+
+function layoutText() {
+  const nm = (CONFIG.recipientName || '').trim(), maxW = 16 * K;
+  let f = K * 2.4, t;
+  for (let i = 0; i < 40; i++) {
+    fx.font = `italic 600 ${f}px ${TF}`;
+    const cap = fx.measureText('Y').actualBoundingBoxAscent || f * .72;
+    const wLY = fx.measureText('I Love You').width, hs = cap * 1.45, hw = hs * .71, g = f * .24, w1 = wLY + g + hw;
+    const lines = []; let ln = '';
+    for (const w of nm.split(/\s+/).filter(Boolean)) {
+      const t2 = ln ? ln + ' ' + w : w;
+      if (ln && fx.measureText(t2).width > maxW) { lines.push(ln); ln = w; } else ln = t2;
+    }
+    if (ln) lines.push(ln);
+    const w2 = Math.max(0, ...lines.map(l => fx.measureText(l).width));
+    t = { f, cap, wLY, hs, hw, g, w1, lines };
+    if ((w1 <= maxW && w2 <= maxW && (1 + lines.length) * f * 1.32 <= 9 * K) || f < 8) break;
+    f *= .93;
+  }
+  TXT = t;
+}
+
+function build() {
+  buildRain(); mkSprites();
+  const keys = ['3', '2', '1', 'You', 'Are', 'My', 'Love'];
+  const m = document.createElement('canvas').getContext('2d'); m.font = FONT(100);
+  const mw = Math.max(...keys.map(k => m.measureText(k).width));
+  _fs = Math.min(W * .82 / mw * 100, Math.min(W, H) * .4);
+  S = Math.max(3.6, _fs / 17);
+  keys.forEach(k => TG[k] = sample(k));
+  HN = mob ? 300 : 520;
+  K = Math.min(W * .84 / 33, H * .62 / 29.5); CY = H * .47;
+  layoutText();
+  const need = Math.max(HN, ...keys.map(k => TG[k].length));
+  const before = pool.length;
+  while (pool.length < need) pool.push({
+    i: pool.length, x: R() * W, y: R() * H, tx: 0, ty: 0, a: 0, ta: 0, ph: R() * PI2, sp: 5 + R() * 4,
+    hu: 0, b: .9 + R() * .2, hs: .6 + R() * .7, col: R() * 3 | 0, sr: 1.5 + R() * 4, sv: (R() < .5 ? -1 : 1) * (.5 + R()), rs: .6 + R()
+  });
+  if (pool.length !== before) {
+    perm = pool.map((_, i) => i);
+    for (let i = perm.length - 1; i > 0; i--) { const j = R() * (i + 1) | 0; [perm[i], perm[j]] = [perm[j], perm[i]]; }
+  }
+  if (cur) apply(cur);
+}
+
+function apply(k) {
+  cur = k; const pts = TG[k];
+  if (k === 'heart') {
+    for (const q of pool) { q.ta = q.i < HN ? 1 : 0; q.hu = q.i / HN * PI2 + (R() - .5) * .04; }
+    return;
+  }
+  for (let j = 0; j < perm.length; j++) {
+    const q = pool[perm[j]];
+    if (pts && j < pts.length) { q.tx = pts[j][0]; q.ty = pts[j][1]; q.ta = 1; }
+    else if (k === 'dot') { q.tx = W / 2; q.ty = H * .48; q.ta = j ? 0 : 1; }
+    else { q.tx = R() * W; q.ty = R() * H; q.ta = k === 'sc' ? .45 : 0; }
+  }
+}
+
+/* ---------- Foreground drawing ---------- */
+function drawFg(dt) {
+  fx.setTransform(dpr, 0, 0, dpr, 0, 0); fx.clearRect(0, 0, W, H);
+  const heart = cur === 'heart', p = Math.min(1, (T - ps) / pd), txt = !!TG[cur];
+  const amp = S * .05 + (txt && p > .78 ? (p - .78) / .22 * S * 1.1 : 0);
+  let beat = 1;
+  if (heart) {
+    const bt = (T % 1.25) / 1.25;
+    beat = 1 + .055 * (Math.exp(-(((bt - .1) / .055) ** 2)) + .7 * Math.exp(-(((bt - .32) / .07) ** 2)));
+    beat = 1 + (beat - 1) * Math.min(1, (T - 18) / 1.5);
+  }
+  const ea = 1 - Math.exp(-dt * (heart ? 2.2 : 5));
+  for (const q of pool) {
+    let jx = 0, jy = 0;
+    if (heart && q.i < HN) {
+      q.hu += dt * .035;
+      const u = q.hu, s = Math.sin(u), hx = 16 * s * s * s;
+      const hy = 13 * Math.cos(u) - 5 * Math.cos(2 * u) - 2 * Math.cos(3 * u) - Math.cos(4 * u);
+      const b = q.b * beat * K, sw = q.sr * K / 10, an = T * q.sv + q.ph;
+      q.tx = W / 2 + hx * b + Math.cos(an) * sw; q.ty = CY - (hy + 2.5) * b + Math.sin(an) * sw;
+    } else if (!heart) { jx = Math.sin(T * 7 + q.ph) * amp; jy = Math.cos(T * 6.3 + q.ph * 1.3) * amp; }
+    const e = 1 - Math.exp(-dt * q.sp);
+    q.x += (q.tx + jx - q.x) * e; q.y += (q.ty + jy - q.y) * e; q.a += (q.ta - q.a) * ea;
+    if (q.a < .02) continue;
+    if (heart) {
+      const d = K * q.hs * 2, r = Math.sin(T * q.rs + q.ph) * .5, c = Math.cos(r) * dpr, sn = Math.sin(r) * dpr;
+      fx.globalAlpha = q.a * (.78 + .22 * Math.sin(T * 3 + q.ph));
+      fx.setTransform(c, sn, -sn, c, q.x * dpr, q.y * dpr);
+      fx.drawImage(sH[q.col], -d / 2, -d / 2, d, d);
+    } else {
+      const d = S * 1.51; fx.globalAlpha = q.a;
+      fx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      fx.drawImage(sD, q.x - d / 2, q.y - d / 2, d, d);
+    }
+  }
+  fx.setTransform(dpr, 0, 0, dpr, 0, 0); fx.globalAlpha = 1;
+  if (heart) heartText(beat);
+}
+
+function heartText(beat) {
+  const a = Math.min(1, Math.max(0, (T - 18.8) / 1.6));
+  if (a <= 0 || !TXT) return;
+  const t = TXT, cx = W / 2, cy = CY - 3.5 * K, lh = t.f * 1.32, sb = 1 + (beat - 1) * .5;
+  fx.save(); fx.translate(cx, cy); fx.scale(sb, sb); fx.translate(-cx, -cy);
+  fx.globalAlpha = a; fx.textBaseline = 'alphabetic'; fx.textAlign = 'left';
+  fx.font = `italic 600 ${t.f}px ${TF}`; fx.shadowColor = '#ff4d88'; fx.shadowBlur = mob ? 6 : 12;
+  const n = 1 + t.lines.length;
+  let y = cy - (n - 1) * lh / 2 + t.cap / 2, x = cx - t.w1 / 2;   /* y = baseline of line 1 */
+  fx.fillStyle = '#ffd1e3'; fx.fillText('I Love You', x, y);
+  /* heart AFTER "You", centred on the cap height of the text */
+  fx.fillStyle = '#ff5a7a'; hp(fx, x + t.wLY + t.g + t.hw / 2, y - t.cap / 2 - t.hs * .027, t.hs); fx.fill();
+  fx.textAlign = 'center'; fx.fillStyle = '#ffffff';
+  for (const l of t.lines) fx.fillText(l, cx, y += lh);
+  fx.restore();
+}
+
+/* ---------- Start-screen ambient dust (depth layers) ---------- */
+const amb = Array.from({ length: 64 }, () => { const z = .25 + R() * .75; return { x: R(), y: R(), z, v: (.01 + R() * .02) * z, sw: R() * PI2, sa: .008 + R() * .02, ph: R() * PI2, c: R() < .6 ? 0 : 1 }; });
+const ambT0 = performance.now() / 1000;
+function ambient(dt) {
+  sx.clearRect(0, 0, W, H);
+  const t = performance.now() / 1000, n = mob ? 40 : 64, fade = Math.min(1, (t - ambT0) / 2.5);
+  for (let i = 0; i < n; i++) {
+    const a = amb[i]; a.y -= a.v * dt; if (a.y < -.06) { a.y = 1.06; a.x = R(); }
+    const d = (3 + a.z * a.z * 17) * (mob ? .8 : 1), x = (a.x + Math.sin(t * .25 + a.sw) * a.sa) * W;
+    sx.globalAlpha = (.1 + .5 * a.z) * (.55 + .45 * Math.sin(t * (.6 + a.z) + a.ph)) * fade;
+    sx.drawImage(a.c ? sR : sP, x - d / 2, a.y * H - d / 2, d, d);
+  }
+  sx.globalAlpha = 1;
+}
+
+/* ---------- Main loop & resizing (timeline survives resize) ---------- */
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - last) / 1000, .1); last = now;
+  if (!started || T < 1.1) ambient(dt);
+  if (!started) return;
+  T += dt;
+  while (ti < TL.length && T >= TL[ti][0]) {
+    apply(TL[ti][1]); ps = TL[ti][0]; pd = (TL[ti + 1] ? TL[ti + 1][0] : 1e9) - ps; ti++;
+  }
+  drawRain(dt); drawFg(dt);
+}
+
+function size() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight; mob = Math.min(W, H) < 600;
+  [bg, fg, sc].forEach(c => { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); c.style.width = W + 'px'; c.style.height = H + 'px'; });
+  bx.setTransform(dpr, 0, 0, dpr, 0, 0); fx.setTransform(dpr, 0, 0, dpr, 0, 0); sx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  build();
+}
+let rt; const rs = () => { clearTimeout(rt); rt = setTimeout(size, 80); };
+addEventListener('resize', rs);
+addEventListener('orientationchange', () => setTimeout(size, 250));
+size();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
